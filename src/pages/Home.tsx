@@ -1,46 +1,93 @@
+import { Typography, Button, Grid, Box } from "@material-ui/core";
+import Logo from "../components/Logo";
+import RoomInput from "../components/RoomInput";
+import useHomeStyles from "../styles/home";
+import SlideButton from "../components/SlideButton";
+import { useState } from "react";
+import ProfileMenu from "../components/ProfileMenu";
+import Presentation from "../components/Presentation";
+import { useEffect } from "react";
+import appStore from "../stores/app";
+import authStore from "../stores/auth";
+import { observer } from "mobx-react-lite";
 import { useHistory } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import roomStore from "../stores/room";
 
-import illustrationImg from "../assets/images/illustration.svg";
-import logoImg from "../assets/images/logo.svg";
-import googleIconImg from "../assets/images/google-icon.svg";
+function Home() {
+  const [slideState, setSlideState] = useState<"left" | "right">("left");
+  const [room, setRoom] = useState("");
+  const history = useHistory();
+  const classes = useHomeStyles();
+  const isCreating = slideState === "left";
 
-import { Button } from "../components/Button";
+  function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
+    setRoom(event.target.value.trim());
+  }
 
-import "../styles/auth.scss";
+  async function handleButtonClick() {
+    if (!authStore.user || !room) return;
 
-export function Home() {
-    const history = useHistory();
-    const { user, signInWithGoogle } = useAuth();
-
-    async function handleCreateRoom() {
-        if (!user) {
-            await signInWithGoogle();
-        }
-        history.push("/rooms/new");
+    if (isCreating) {
+      const roomData = await roomStore.createRoom(
+        room.trim(),
+        authStore.user.uid
+      );
+      history.push(`/room/${roomData.code}`);
+    } else {
+      try {
+        const roomData = await roomStore.checkRoom(room);
+        history.push(`/room/${roomData.code}`);
+      } catch (e) {
+        appStore.setNotification("A sala não existe!");
+      }
     }
+  }
 
-    return (
-        <div id="page-auth">
-            <aside>
-               <img src={illustrationImg} alt="illustrationImg" />
-               <strong>Crie salas de Q&amp;A ao-vivo</strong>
-               <p>Tire as dúvidas de sua audiência em tempo-real</p> 
-            </aside>
-            <main>
-                <div className="main-content">
-                    <img src={logoImg} alt="Logotipo" />
-                    <button onClick={handleCreateRoom} className="create-room">
-                        <img src={googleIconImg} alt="Logotipo do Google" />
-                        Crie sua sala com o Google
-                    </button>
-                    <div className="separator">ou entre em uma sala</div>
-                    <form>
-                        <input type="text" placeholder="Digite o código da sala" />
-                        <Button type="submit">Entrar na sala</Button>
-                    </form>
-                </div>
-            </main>
-        </div>
-    )
+  useEffect(() => {
+    setRoom("");
+  }, [slideState]);
+
+  return (
+    <Grid container spacing={0} className={classes.root}>
+      <Box clone order={{ xs: 2, sm: 2, md: 1 }}>
+        <Grid item xs={12} md={6} className={classes.presentation}>
+          <Presentation />
+        </Grid>
+      </Box>
+
+      <Box clone order={{ xs: 1, sm: 1, md: 2 }}>
+        <Grid xs={12} item md={6} className={classes.joinRoom}>
+          <ProfileMenu />
+
+          <Logo verticalMargin />
+
+          <SlideButton state={slideState} setState={setSlideState} />
+
+          <Typography variant="h2" className={classes.action}>
+            {isCreating ? "Crie uma nova sala" : "Entrar em uma sala"}
+          </Typography>
+
+          <RoomInput
+            value={room}
+            onChange={handleInputChange}
+            className={classes.input}
+            placeholder={
+              isCreating ? "Nome da sala" : "Digite o código da sala"
+            }
+          />
+
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={handleButtonClick}
+          >
+            {isCreating ? "Criar sala" : "Entrar na sala"}
+          </Button>
+        </Grid>
+      </Box>
+    </Grid>
+  );
 }
+
+export default observer(Home);
